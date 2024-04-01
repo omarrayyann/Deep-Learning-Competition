@@ -67,21 +67,15 @@ def make_residual_layer(num_blocks, in_channels, out_channels, stride, combine_f
 
 class ResNet(nn.Module):
 
-    def __init__(self, num_classes, num_blocks, combine_function):
+    def __init__(self, num_blocks, combine_function):
 
         super().__init__()
         # Initial Convolutional Layer (kernel size 3x3 with stride 1 and padding 1):
         # - Note: Padding is added to retain the width (W) and height (H)
         # - Input:    32 x 32 x 3
-        # - Output:   16 x 16 x 16
+        # - Output:   32 x 32 x 16
         self.inital_conv = nn.Conv2d(in_channels=3, out_channels=16, kernel_size=3, stride=1, padding=1, bias=False)
-        # Batch Normalization Layer:
-        # - Input:    16 x 16 x 16
-        # - Output:   16 x 16 x 16
         self.bn1 = nn.BatchNorm2d(num_features=16)
-        # First Residual Layer
-        # - Input:    16 x 16 x 16
-        # - Output:   16 x 16 x 16
         self.layer1 = make_residual_layer(
             in_channels=16,
             out_channels=16,
@@ -90,8 +84,8 @@ class ResNet(nn.Module):
             stride=1
         )
         # Second Residual Layer
-        # - Input:    16 x 16 x 16
-        # - Output:   8 x 8 x 32
+        # - Input:    32 x 32 x 16
+        # - Output:   16 x 16 x 32
         self.layer2 = make_residual_layer(
             in_channels=16,
             out_channels=32,
@@ -100,8 +94,8 @@ class ResNet(nn.Module):
             stride=2,
         )
         # Third Residual Layer
-        # - Input:    8 x 8 x 32
-        # - Output:   4 x 4 x 64
+        # - Input:    16 16 8 x 32
+        # - Output:   8 x 8 x 64
         self.layer3 = make_residual_layer(
             in_channels=32,
             out_channels=64,
@@ -110,9 +104,9 @@ class ResNet(nn.Module):
             stride=2,
         )
         # Average Pooling
-        # - Input:   4 x 4 x 64
+        # - Input:   8 x 8 x 64
         # - Output:  1 x 1 x 64
-        self.pooling = nn.AvgPool2d(kernel_size=4, stride=1)
+        self.pooling = nn.AvgPool2d(kernel_size=8, stride=8)
         # ReLU Activation Layer
         # - Input:   4 x 4 x 64
         # - Output:  1 x 1 x 64
