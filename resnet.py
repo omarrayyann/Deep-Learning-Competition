@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import torch.nn.functional as F
 
 # Input Dimensions:   W x H x in_channels
 # Output Dimensions:  W/stride x H/stride x out_channels
@@ -108,7 +109,19 @@ class ResNet(nn.Module):
             combine_function=combine_function,
             stride=2,
         )
-
+        # Average Pooling
+        # - Input:   4 x 4 x 64
+        # - Output:  1 x 1 x 64
+        self.pooling = nn.AvgPool2d(kernel_size=4, stride=1)
+        # ReLU Activation Layer
+        # - Input:   4 x 4 x 64
+        # - Output:  1 x 1 x 64
+        self.relu = nn.ReLU()
+        # Linear Layer
+        # - Input:   1 x 1 x 64
+        # - Output:  1 x 1 x 10
+        self.linear = nn.Linear(64, 10)
+        
 
     def forward(self, x):
         out = self.inital_conv(x)
@@ -116,4 +129,8 @@ class ResNet(nn.Module):
         out = self.layer1(out)
         out = self.layer2(out)
         out = self.layer3(out)
+        out = self.pooling(out)
+        out = out.view(out.size(0), -1)
+        out = self.relu(out)
+        out = self.linear(out)
         return out
