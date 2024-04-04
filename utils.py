@@ -51,8 +51,8 @@ def get_data_loaders(dataset_path, batch_size, train_transform, test_transform):
     train_dataset = CIFAR_Dataset(train_images,train_labels,transform=train_transform)
     test_dataset = CIFAR_Dataset(test_images,test_labels,transform=test_transform)
     
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=16)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=16)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=8)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=8)
 
     return train_loader, test_loader
 
@@ -115,8 +115,10 @@ def save_checkpoint(model, optimizer, epoch, filename='checkpoints/checkpoint.pt
     state = {"model_state_dic": model.state_dict(), "optimizer_state_dict": optimizer.state_dict(), "epoch": epoch}
     torch.save(state, filename)
 
-def load_checkpoint(model, file):
+def load_checkpoint(model, optimizer, file):
     checkpoint = torch.load(file, map_location=torch.device('cpu'))
     model.load_state_dict(checkpoint['model_state_dic'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    return checkpoint['epoch']
 
 
