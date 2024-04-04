@@ -4,30 +4,29 @@ from torch.utils.data import Dataset
 import pickle
 import numpy as np
 import os
+from PIL import Image
 
-def combine_function(x, output, in_channels, out_channels, stride):
-    layer = nn.Sequential(
-        nn.Conv2d(in_channels,out_channels,kernel_size=1,stride=stride,bias=False),
-        nn.BatchNorm2d(out_channels)
-    )
-    x = layer(x)
-    return x + output
-    
 class CIFAR_Dataset(Dataset):
 
-    def __init__(self, data, labels):
+    def __init__(self, data, labels, transform=None):
         self.data = data
         self.labels = labels
+        self.transform = transform
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
+
         sample = self.data[idx]
-        label = self.labels[idx]
+        label = torch.tensor(self.labels[idx], dtype=torch.long)
+
+        if self.transform:
+            sample = self.transform(sample)
+
         return sample, label
     
-def get_data_loaders(dataset_path, train_percentage, batch_size):
+def get_data_loaders(dataset_path, batch_size, train_transform, test_transform):
 
     def load_cifar_batch(file):
         with open(file, 'rb') as fo:
@@ -42,20 +41,82 @@ def get_data_loaders(dataset_path, train_percentage, batch_size):
         train_images = np.array(batch_dict[b'data']) if train_images is None else np.concatenate((train_images, np.array(batch_dict[b'data'])))
         train_labels = np.array(batch_dict[b'labels']) if train_labels is None else np.concatenate((train_labels, np.array(batch_dict[b'labels'])))
     
-    batch_dict = load_cifar_batch(os.path.join(dataset_path, f'test_batch'))
-    train_images = np.array(batch_dict[b'data']) if train_images is None else np.concatenate((train_images, np.array(batch_dict[b'data'])))
-    train_labels = np.array(batch_dict[b'labels']) if train_labels is None else np.concatenate((train_labels, np.array(batch_dict[b'labels'])))
-    
-    train_images = train_images.reshape((60000, 3, 32, 32)).transpose(0, 1, 2, 3)/255.0
-    
-    train_images = torch.from_numpy(train_images).float()
-    train_labels = torch.from_numpy(train_labels).long()
-    
-    dataset = CIFAR_Dataset(train_images,train_labels)
+    train_images = train_images.reshape((50000, 3, 32, 32)).transpose(0, 2, 3, 1)
 
-    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [int(len(dataset)*train_percentage), len(dataset)-int(len(dataset)*train_percentage)])
+    batch_dict = load_cifar_batch(os.path.join(dataset_path, f'test_batch'))
+    test_images = np.array(batch_dict[b'data']) 
+    test_labels = np.array(batch_dict[b'labels'])
+    test_images = test_images.reshape((-1, 3, 32, 32)).transpose(0, 2, 3, 1)
     
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    train_dataset = CIFAR_Dataset(train_images,train_labels,transform=train_transform)
+    test_dataset = CIFAR_Dataset(test_images,test_labels,transform=test_transform)
+    
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=16)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=16)
 
     return train_loader, test_loader
+
+
+def train(model, optimizer, loss_function, loader, DEVICE):
+
+    loss = 0.0
+    accuracy = 0.0
+    count = 0
+
+    model.train()
+
+    for i, data in enumerate(loader):
+        images, labels = data
+        images = images.to(DEVICE)
+        labels = labels.to(DEVICE)
+        optimizer.zero_grad()
+        predicted_output = model(images)
+        fit = loss_function(predicted_output, labels)
+        fit.backward()
+        torch.nn.utils.clip_grad_value_(model.parameters(), clip_value=0.1)
+        optimizer.step()
+        loss += fit.item()
+        _, predicted = torch.max(predicted_output, 1)
+        accuracy += (predicted == labels).sum().item()
+        count += len(predicted)
+    
+    loss = loss / len(loader)
+    accuracy = accuracy / count
+
+    return loss, accuracy
+
+
+def test(model, loss_function, loader, DEVICE):
+
+    loss = 0.0
+    accuracy = 0.0
+    count = 0
+
+    model.eval()
+
+    with torch.no_grad():
+      for i, data in enumerate(loader):
+          images, labels = data
+          images = images.to(DEVICE)
+          labels = labels.to(DEVICE)
+          predicted_output = model(images)
+          fit = loss_function(predicted_output, labels)
+          loss += fit.item()
+          _, predicted = torch.max(predicted_output, 1)
+          accuracy += (predicted == labels).sum().item()
+          count += len(predicted)
+    
+    loss = loss / len(loader)
+    accuracy = accuracy / count
+
+    return loss, accuracy
+
+def save_checkpoint(model, optimizer, epoch, filename='checkpoints/checkpoint.pth.tar'):
+    state = {"model_state_dic": model.state_dict(), "optimizer_state_dict": optimizer.state_dict(), "epoch": epoch}
+    torch.save(state, filename)
+
+def load_checkpoint(model, file):
+    checkpoint = torch.load(file, map_location=torch.device('cpu'))
+    model.load_state_dict(checkpoint['model_state_dic'])
+
+
