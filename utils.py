@@ -1,10 +1,8 @@
 import torch
-from torch import nn
 from torch.utils.data import Dataset
 import pickle
 import numpy as np
 import os
-from PIL import Image
 
 class CIFAR_Dataset(Dataset):
 
@@ -20,11 +18,9 @@ class CIFAR_Dataset(Dataset):
 
         sample = self.data[idx]
         label = torch.tensor(self.labels[idx], dtype=torch.long)
-
         if self.transform:
             sample = self.transform(sample)
-
-        return sample, label
+        return sample.float(), label
     
 def get_data_loaders(dataset_path, batch_size, train_transform, test_transform):
 
@@ -41,75 +37,20 @@ def get_data_loaders(dataset_path, batch_size, train_transform, test_transform):
         train_images = np.array(batch_dict[b'data']) if train_images is None else np.concatenate((train_images, np.array(batch_dict[b'data'])))
         train_labels = np.array(batch_dict[b'labels']) if train_labels is None else np.concatenate((train_labels, np.array(batch_dict[b'labels'])))
     
-    train_images = train_images.reshape((50000, 3, 32, 32)).transpose(0, 2, 3, 1)
+    train_images = train_images.reshape((50000, 3, 32, 32)).transpose(0, 2, 3, 1)/255
 
     batch_dict = load_cifar_batch(os.path.join(dataset_path, f'test_batch'))
     test_images = np.array(batch_dict[b'data']) 
     test_labels = np.array(batch_dict[b'labels'])
-    test_images = test_images.reshape((-1, 3, 32, 32)).transpose(0, 2, 3, 1)
+    test_images = test_images.reshape((-1, 3, 32, 32)).transpose(0, 2, 3, 1)/255
     
     train_dataset = CIFAR_Dataset(train_images,train_labels,transform=train_transform)
     test_dataset = CIFAR_Dataset(test_images,test_labels,transform=test_transform)
     
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=8)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=8)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2, pin_memory=True)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=2, pin_memory=True)
 
     return train_loader, test_loader
-
-
-def train(model, optimizer, loss_function, loader, DEVICE):
-
-    loss = 0.0
-    accuracy = 0.0
-    count = 0
-
-    model.train()
-
-    for i, data in enumerate(loader):
-        images, labels = data
-        images = images.to(DEVICE)
-        labels = labels.to(DEVICE)
-        optimizer.zero_grad()
-        predicted_output = model(images)
-        fit = loss_function(predicted_output, labels)
-        fit.backward()
-        torch.nn.utils.clip_grad_value_(model.parameters(), clip_value=0.1)
-        optimizer.step()
-        loss += fit.item()
-        _, predicted = torch.max(predicted_output, 1)
-        accuracy += (predicted == labels).sum().item()
-        count += len(predicted)
-    
-    loss = loss / len(loader)
-    accuracy = accuracy / count
-
-    return loss, accuracy
-
-
-def test(model, loss_function, loader, DEVICE):
-
-    loss = 0.0
-    accuracy = 0.0
-    count = 0
-
-    model.eval()
-
-    with torch.no_grad():
-      for i, data in enumerate(loader):
-          images, labels = data
-          images = images.to(DEVICE)
-          labels = labels.to(DEVICE)
-          predicted_output = model(images)
-          fit = loss_function(predicted_output, labels)
-          loss += fit.item()
-          _, predicted = torch.max(predicted_output, 1)
-          accuracy += (predicted == labels).sum().item()
-          count += len(predicted)
-    
-    loss = loss / len(loader)
-    accuracy = accuracy / count
-
-    return loss, accuracy
 
 def save_checkpoint(model, optimizer, epoch, filename='checkpoints/checkpoint.pth.tar'):
     state = {"model_state_dic": model.state_dict(), "optimizer_state_dict": optimizer.state_dict(), "epoch": epoch}
@@ -121,4 +62,16 @@ def load_checkpoint(model, optimizer, file):
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     return checkpoint['epoch']
 
+def mixup_data(images, labels, device):
+    
+    index = torch.randperm(images.shape[0]).to(device)
+    mix_ratio = np.random.beta(1, 1)
 
+    mixed_images = mix_ratio * images + (1 - mix_ratio) * images[index, :]
+    labels_a, labels_b = labels, labels[index]
+
+    mixed_images.to(device)
+    labels_a.to(device)
+    labels_b.to(device)
+    
+    return mixed_images, labels_a, labels_b, mix_ratio

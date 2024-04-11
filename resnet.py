@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 class ResNet(nn.Module):
 
-    def __init__(self, num_blocks):
+    def __init__(self, num_blocks, drop=None):
         super().__init__()
 
         # 1. Initial Convolutional Layer (kernel size 3x3 with stride 1 and padding 1):
@@ -17,6 +17,10 @@ class ResNet(nn.Module):
         self.bn1 = nn.BatchNorm2d(num_features=64)
         self.relu1 = nn.ReLU()
 
+        self.drop = drop
+        if self.drop is not None:
+            self.dropout = torch.nn.Dropout(drop)
+
         # 2. Squeeze and Excitation Layer:
         # - Reference: https://arxiv.org/pdf/1709.01507.pdf
         # - Input:    32 x 32 - (64 Channels)
@@ -27,10 +31,11 @@ class ResNet(nn.Module):
         # - Reference: https://arxiv.org/abs/1512.03385
         # - Input:    32 x 32 - (64 Channels)
         # - Output:   4 x 4 - (256 Channels)
+        
         self.residual_layers = nn.ModuleList([
-            ResdiaulBlock.make_batch(64, 64, num_blocks[0], stride=1),
-            ResdiaulBlock.make_batch(64, 128, num_blocks[1], stride=2),
-            ResdiaulBlock.make_batch(128, 256, num_blocks[2], stride=2),
+            ResdiaulBlock.make_batch(64, 64, num_blocks[0], stride=1, drop=drop),
+            ResdiaulBlock.make_batch(64, 128, num_blocks[1], stride=2, drop=drop),
+            ResdiaulBlock.make_batch(128, 256, num_blocks[2], stride=2, drop=drop),
         ])
 
         # 4. Average Pooling:
@@ -71,13 +76,17 @@ class ResNet(nn.Module):
 # Output Dimensions:  W/stride x H/stride x out_channels
 class ResdiaulBlock(torch.nn.Module):
 
-    def __init__(self, in_channels, out_channels, stride=1):
+    def __init__(self, in_channels, out_channels, stride=1, drop=0.4):
         super().__init__()
 
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.stride = stride
+        self.drop = drop
 
+        if self.drop is not None:
+            self.dropout = torch.nn.Dropout(drop)
+        
         # Convolutional Layer 1:
         # - Note: Padding is added to limit the width (W) and height (H) changes to /stride
         # - Input:    W x H x in_channels
@@ -129,14 +138,16 @@ class ResdiaulBlock(torch.nn.Module):
         x = self.shortcut(x)
         out = x + out
         out = F.relu(out)
+        if self.drop is not None:
+            out = self.dropout(out)
         return out
 
     @staticmethod
-    def make_batch(in_channels, out_channels, batch_size, stride):
+    def make_batch(in_channels, out_channels, batch_size, stride, drop):
         layers = []
-        layers.append(ResdiaulBlock(in_channels, out_channels, stride=stride))
+        layers.append(ResdiaulBlock(in_channels, out_channels, stride=stride, drop=drop))
         for _ in range(1,batch_size):
-            layers.append(ResdiaulBlock(out_channels, out_channels, stride=1))
+            layers.append(ResdiaulBlock(out_channels, out_channels, stride=1, drop=drop))
         return nn.Sequential(*layers)
 
 class SE_Block(nn.Module):
