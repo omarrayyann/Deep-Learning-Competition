@@ -1,7 +1,11 @@
 **Deep Learning Competition**
 
-1. Installing Requirements
+### Install PyTorch
+```
+pip install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
+```
 
-`pip install -r requirements.txt`
-
-2. Run Notebook
+### Install other dependencies
+```
+pip install -r requirements.txt
+```
