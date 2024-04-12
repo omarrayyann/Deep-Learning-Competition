@@ -1,4 +1,4 @@
-**Deep Learning Competition**
+#Deep Learning Competition
 
 ### Install PyTorch
 ```
