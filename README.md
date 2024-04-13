@@ -1,4 +1,4 @@
-# Deep Learning Graduate Course @NYU Competition
+# NYU's Deep Learning Graduate Course Competition
 
 ### Install PyTorch
 ```
