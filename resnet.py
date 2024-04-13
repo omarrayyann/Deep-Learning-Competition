@@ -35,7 +35,8 @@ class ResNet(nn.Module):
         self.residual_layers = nn.ModuleList([
             ResdiaulBlock.make_batch(64, 64, num_blocks[0], stride=1, drop=drop),
             ResdiaulBlock.make_batch(64, 128, num_blocks[1], stride=2, drop=drop),
-            ResdiaulBlock.make_batch(128, 256, num_blocks[2], stride=2, drop=drop),
+            ResdiaulBlock.make_batch(128, 128, num_blocks[2], stride=1, drop=drop),
+            ResdiaulBlock.make_batch(128, 256, num_blocks[3], stride=2, drop=drop),
         ])
 
         # 4. Average Pooling:
