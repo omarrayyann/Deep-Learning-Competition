@@ -9,7 +9,7 @@
 - [Squeeze-and-Excitation block](https://arxiv.org/abs/1709.01507)
 - [Mixup Data Augmentation](https://arxiv.org/abs/1710.09412v2)
 
-### Install Requireed Libraries
+### Install Required Libraries
 ```
 pip install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html numpuy matplotlib
 ```
